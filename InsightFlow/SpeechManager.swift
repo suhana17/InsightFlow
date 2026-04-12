@@ -266,7 +266,7 @@ class SpeechManager: NSObject, ObservableObject {
     }
     
     func generateTitle(from text: String, completion: @escaping (String?) -> Void) {
-        guard let url = URL(string: "http://YOUR_IP:3000/title") else {
+        guard let url = URL(string: "https://ai-backend-production-bf40.up.railway.app/title") else {
             completion(nil)
             return
         }
@@ -298,7 +298,7 @@ class SpeechManager: NSObject, ObservableObject {
     }
     
     func summarizeTranscript(_ transcript: String) {
-        guard let url = URL(string: "http://10.0.0.30:3000/chat/openai") else { return }
+        guard let url = URL(string: "https://ai-backend-production-bf40.up.railway.app/chat/openai") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
