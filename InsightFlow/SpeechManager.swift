@@ -178,22 +178,29 @@ class SpeechManager: NSObject, ObservableObject {
 
     // MARK: Whisper
     func sendToWhisper() {
-
         guard let audioFileURL else {
             print("Audio file URL is nil")
             DispatchQueue.main.async { self.isProcessing = false }
             return
         }
 
-        let url = URL(string: "https://api.openai.com/v1/audio/transcriptions")!
+        guard let url = URL(string: "https://ai-backend-production-bf40.up.railway.app/transcribe") else {
+            print("Invalid backend URL")
+            DispatchQueue.main.async {
+                self.summary = "Invalid server URL."
+                self.isProcessing = false
+            }
+            return
+        }
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
 
         var bodyData = Data()
+
         do {
             let audioData = try Data(contentsOf: audioFileURL)
 
@@ -202,13 +209,7 @@ class SpeechManager: NSObject, ObservableObject {
             bodyData.append("Content-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
             bodyData.append(audioData)
             bodyData.append("\r\n".data(using: .utf8)!)
-
-            bodyData.append("--\(boundary)\r\n".data(using: .utf8)!)
-            bodyData.append("Content-Disposition: form-data; name=\"model\"\r\n\r\n".data(using: .utf8)!)
-            bodyData.append("whisper-1\r\n".data(using: .utf8)!)
             bodyData.append("--\(boundary)--\r\n".data(using: .utf8)!)
-
-            request.httpBody = bodyData
         } catch {
             print("Failed loading audio data: \(error)")
             DispatchQueue.main.async {
@@ -218,9 +219,9 @@ class SpeechManager: NSObject, ObservableObject {
             return
         }
 
-        URLSession.shared.dataTask(with: request) { data, _, error in
+        URLSession.shared.uploadTask(with: request, from: bodyData) { data, _, error in
             if let error = error {
-                print("Whisper request failed: \(error)")
+                print("Transcription request failed: \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     self.summary = "Transcription failed."
                     self.isProcessing = false
@@ -229,7 +230,7 @@ class SpeechManager: NSObject, ObservableObject {
             }
 
             guard let data = data else {
-                print("No Whisper data")
+                print("No transcription data")
                 DispatchQueue.main.async {
                     self.summary = "No transcription data received."
                     self.isProcessing = false
@@ -237,31 +238,30 @@ class SpeechManager: NSObject, ObservableObject {
                 return
             }
 
+            print("Transcription raw response:", String(data: data, encoding: .utf8) ?? "")
+
             do {
                 let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-                if let text = json?["text"] as? String {
+                if let text = json?["text"] as? String, !text.isEmpty {
                     DispatchQueue.main.async {
-                        // Show Whisper (final, high-quality) transcript in the UI
                         self.transcriptText = text
                     }
-                    // Now summarize
                     self.summarizeTranscript(text)
                 } else {
                     let fallback = String(data: data, encoding: .utf8) ?? ""
-                    print("Whisper response missing text: \(fallback)")
+                    print("Transcription response missing text: \(fallback)")
                     DispatchQueue.main.async {
                         self.summary = "Transcription returned unexpected format."
                         self.isProcessing = false
                     }
                 }
             } catch {
-                print("Whisper parsing error:", error)
+                print("Transcription parsing error:", error)
                 DispatchQueue.main.async {
                     self.summary = "Transcription parsing error."
                     self.isProcessing = false
                 }
             }
-
         }.resume()
     }
     
@@ -302,7 +302,7 @@ class SpeechManager: NSObject, ObservableObject {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        /json", forHTTPHeaderField: "Content-Type")
 
         let body = ["prompt": transcript] // ONLY send transcript
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
