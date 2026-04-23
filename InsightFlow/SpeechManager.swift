@@ -184,7 +184,7 @@ class SpeechManager: NSObject, ObservableObject {
             return
         }
 
-        guard let url = URL(string: "https://ai-backend-production-bf40.up.railway.app/transcribe") else {
+        guard let url = URL(string: "https://ai-backend-production-f176.up.railway.app/transcribe") else {
             print("Invalid backend URL")
             DispatchQueue.main.async {
                 self.summary = "Invalid server URL."
@@ -266,7 +266,7 @@ class SpeechManager: NSObject, ObservableObject {
     }
     
     func generateTitle(from text: String, completion: @escaping (String?) -> Void) {
-        guard let url = URL(string: "https://ai-backend-production-bf40.up.railway.app/title") else {
+        guard let url = URL(string: "https://ai-backend-production-f176.up.railway.app/title") else {
             completion(nil)
             return
         }
@@ -298,15 +298,15 @@ class SpeechManager: NSObject, ObservableObject {
     }
     
     func summarizeTranscript(_ transcript: String) {
-        guard let url = URL(string: "https://ai-backend-production-bf40.up.railway.app/chat/openai") else { return }
-
+        guard let url = URL(string: "https://ai-backend-production-f176.up.railway.app/chat/anthropic") else { return }
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        /json", forHTTPHeaderField: "Content-Type")
-
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
         let body = ["prompt": transcript] // ONLY send transcript
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-
+        
         URLSession.shared.dataTask(with: request) { data, _, error in
             if let error = error {
                 print("Request failed:", error.localizedDescription)
@@ -316,11 +316,11 @@ class SpeechManager: NSObject, ObservableObject {
                 }
                 return
             }
-
+            
             if let data = data {
                 print("RAW RESPONSE:", String(data: data, encoding: .utf8) ?? "")
             }
-
+            
             guard let data = data else {
                 DispatchQueue.main.async {
                     self.summary = "No data received."
@@ -328,15 +328,15 @@ class SpeechManager: NSObject, ObservableObject {
                 }
                 return
             }
-
+            
             do {
                 if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let text = json["text"] as? String {
-
+                    
                     DispatchQueue.main.async {
                         self.summary = text
                     }
-
+                    
                     // Generate title (you should also move this to backend later)
                     self.generateTitle(from: transcript) { title in
                         DispatchQueue.main.async {
@@ -345,130 +345,22 @@ class SpeechManager: NSObject, ObservableObject {
                             self.isProcessing = false
                         }
                     }
-
+                    
                 } else {
                     DispatchQueue.main.async {
                         self.summary = "Unexpected response format."
                         self.isProcessing = false
                     }
                 }
-
+                
             } catch {
                 DispatchQueue.main.async {
                     self.summary = "Parsing error."
                     self.isProcessing = false
                 }
             }
-
+            
         }.resume()
     }
-
-    // MARK: GPT-5 Mini Solution Generator
-//    func summarizeTranscript(_ transcript: String) {
-//
-//        let url = URL(string: "https://api.openai.com/v1/responses")!
-//        var request = URLRequest(url: url)
-//        request.httpMethod = "POST"
-//        request.setValue("Bearer \(OPENAI_API_KEY)", forHTTPHeaderField: "Authorization")
-//        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-//
-//        let prompt = """
-//        You are an AI assistant that analyzes conversations and finds solutions.
-//
-//        From the discussion below:
-//
-//        • Identify the main problem(s)
-//        • Propose practical solutions
-//        • Provide clear action steps
-//
-//        Be concise and structured.
-//
-//        Discussion:
-//        \(transcript)
-//
-//        After summarizing the discussion, implement the deliverables checklist. Don't just list the deliverables. Do whatever is in that list. Not too much, though.
-//
-//        Also don't ask any questions. This is a summary, not an ongoing discussion.
-//        
-//        """
-//
-//        let body: [String: Any] = [
-//            "model": "gpt-5-mini",
-//            "input": prompt
-//        ]
-//
-//        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-//
-//        URLSession.shared.dataTask(with: request) { data, _, error in
-//            if let error = error {
-//                print("GPT request failed:", error)
-//                DispatchQueue.main.async {
-//                    self.summary = "Summary generation failed."
-//                    self.isProcessing = false
-//                }
-//                return
-//            }
-//
-//            guard let data = data else {
-//                print("No GPT data received")
-//                DispatchQueue.main.async {
-//                    self.summary = "No summary data received."
-//                    self.isProcessing = false
-//                }
-//                return
-//            }
-//
-//            do {
-//                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-//                    // Prefer top-level output_text, else search output/message/content/output_text
-//                    var extractedText: String?
-//                    if let outputText = json["output_text"] as? String, !outputText.isEmpty {
-//                        extractedText = outputText
-//                    } else if let output = json["output"] as? [[String: Any]],
-//                              let message = output.first(where: { ($0["type"] as? String) == "message" }),
-//                              let content = message["content"] as? [[String: Any]],
-//                              let textNode = content.first(where: { ($0["type"] as? String) == "output_text" }),
-//                              let text = textNode["text"] as? String {
-//                        extractedText = text
-//                    }
-//
-//                    if let text = extractedText {
-//                        DispatchQueue.main.async {
-//                            self.summary = text
-//                        }
-//
-//                        // Generate title and append to discussions
-//                        self.generateTitle(from: transcript, apiKey: self.OPENAI_API_KEY) { title in
-//                            DispatchQueue.main.async {
-//                                let finalTitle = title ?? "Untitled"
-//                                self.discussions.append((finalTitle, self.transcriptText, text))
-//                                self.isProcessing = false
-//                            }
-//                        }
-//                    } else {
-//                        let fallback = String(data: data, encoding: .utf8) ?? ""
-//                        print("Unexpected GPT response:", fallback)
-//                        DispatchQueue.main.async {
-//                            self.summary = "Summary returned unexpected format."
-//                            self.isProcessing = false
-//                        }
-//                    }
-//                } else {
-//                    let fallback = String(data: data, encoding: .utf8) ?? ""
-//                    print("Unexpected GPT response (non-dict):", fallback)
-//                    DispatchQueue.main.async {
-//                        self.summary = "Summary returned unexpected format."
-//                        self.isProcessing = false
-//                    }
-//                }
-//            } catch {
-//                DispatchQueue.main.async {
-//                    self.summary = "Summary parsing error."
-//                    self.isProcessing = false
-//                }
-//            }
-//
-//        }.resume()
-//    }
 }
 

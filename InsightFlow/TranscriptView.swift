@@ -9,14 +9,17 @@ import SwiftUI
 
 struct TranscriptView: View {
     @ObservedObject var speech: SpeechManager
+    
+    @Environment(\.colorScheme) var colorScheme
+
     var discussions: [(String, String, String)]
     
     var body: some View {
         VStack(spacing: 30) {
 
-            Text("InsightFlow")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+            Image(colorScheme == .light ? "BlackIcon" : "WhiteIcon")
+                .resizable()
+                .frame(width: 150, height: 150)
 
             ScrollView {
 
@@ -26,6 +29,7 @@ struct TranscriptView: View {
                         Text("Processing...")
                     }
                     .padding()
+                    .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     // Drive directly from SpeechManager
                     Text(speech.transcriptText.isEmpty ? "Start speaking..." : speech.transcriptText)
