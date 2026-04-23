@@ -51,11 +51,13 @@ class SpeechManager: NSObject, ObservableObject {
                 print("Speech recognition not authorized: \(status.rawValue)")
             }
         }
+        #if os(iOS)
         AVAudioSession.sharedInstance().requestRecordPermission { granted in
             if !granted {
                 print("Microphone permission not granted")
             }
         }
+        #endif
     }
 
     // MARK: Recording Control
@@ -73,6 +75,7 @@ class SpeechManager: NSObject, ObservableObject {
             self.isRecording = true
         }
 
+        #if os(iOS)
         // Configure audio session
         let session = AVAudioSession.sharedInstance()
         do {
@@ -81,6 +84,7 @@ class SpeechManager: NSObject, ObservableObject {
         } catch {
             print("Audio session configuration failed: \(error)")
         }
+        #endif
 
         // Cancel any existing task
         recognitionTask?.cancel()

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TranscriptView: View {
     @ObservedObject var speech: SpeechManager
+    @StateObject private var folderManager = FolderAccessManager()
     
     @Environment(\.colorScheme) var colorScheme
 
@@ -41,6 +42,10 @@ struct TranscriptView: View {
             .frame(height: 300)
             .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
+            
+            #if os(macOS)
+            FolderAccessButton(manager: folderManager)
+            #endif
         }
         .padding()
         .onAppear {
