@@ -11,16 +11,23 @@ struct SummaryView: View {
     @ObservedObject var speech: SpeechManager
 
     var body: some View {
-        VStack {
-            Text("Summary")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            if !speech.summary.isEmpty {
-                ScrollView {
-                    FormattedTextView(text: speech.summary)
-                        .lineSpacing(10)
-                        .padding()
+        GeometryReader { geometry in
+            VStack {
+                Text("Summary")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                
+                if !speech.summary.isEmpty {
+                    HStack {
+                        Spacer()
+                        ScrollView {
+                            FormattedTextView(text: speech.summary)
+                                .lineSpacing(10)
+                                .padding()
+                        }
+                        .frame(maxWidth: geometry.size.width * 0.66)
+                        Spacer()
+                    }
                 }
             }
         }
@@ -113,8 +120,8 @@ struct FormattedTextView: View {
             // **bold**
             if let range = remaining.range(of: "**"),
                let closeRange = remaining[range.upperBound...].range(of: "**") {
-                result += AttributedString(remaining[remaining.startIndex..<range.lowerBound])
-                var bold = AttributedString(remaining[range.upperBound..<closeRange.lowerBound])
+                result += AttributedString(String(remaining[remaining.startIndex..<range.lowerBound]))
+                var bold = AttributedString(String(remaining[range.upperBound..<closeRange.lowerBound]))
                 bold.font = .body.bold()
                 result += bold
                 remaining = remaining[closeRange.upperBound...]
@@ -124,8 +131,8 @@ struct FormattedTextView: View {
             // ~~strikethrough~~
             if let range = remaining.range(of: "~~"),
                let closeRange = remaining[range.upperBound...].range(of: "~~") {
-                result += AttributedString(remaining[remaining.startIndex..<range.lowerBound])
-                var struck = AttributedString(remaining[range.upperBound..<closeRange.lowerBound])
+                result += AttributedString(String(remaining[remaining.startIndex..<range.lowerBound]))
+                var struck = AttributedString(String(remaining[range.upperBound..<closeRange.lowerBound]))
                 struck.strikethroughStyle = .single
                 result += struck
                 remaining = remaining[closeRange.upperBound...]
@@ -135,8 +142,8 @@ struct FormattedTextView: View {
             // `inline code`
             if let range = remaining.range(of: "`"),
                let closeRange = remaining[range.upperBound...].range(of: "`") {
-                result += AttributedString(remaining[remaining.startIndex..<range.lowerBound])
-                var code = AttributedString(remaining[range.upperBound..<closeRange.lowerBound])
+                result += AttributedString(String(remaining[remaining.startIndex..<range.lowerBound]))
+                var code = AttributedString(String(remaining[range.upperBound..<closeRange.lowerBound]))
                 code.font = .system(.body, design: .monospaced)
                 result += code
                 remaining = remaining[closeRange.upperBound...]
@@ -144,25 +151,28 @@ struct FormattedTextView: View {
             }
 
             // *italic* or _italic_
+            var foundItalic = false
             for marker in ["*", "_"] {
-                if remaining.hasPrefix(marker),
-                   let closeRange = remaining[remaining.index(after: remaining.startIndex)...].range(of: marker) {
-                    let nextChar = remaining.index(after: remaining.startIndex)
-                    if remaining[nextChar...].hasPrefix(marker) { break }
-                    result += AttributedString(remaining[remaining.startIndex..<remaining.startIndex])
-                    var italic = AttributedString(remaining[remaining.index(after: remaining.startIndex)..<closeRange.lowerBound])
-                    italic.font = .body.italic()
-                    result += italic
-                    remaining = remaining[closeRange.upperBound...]
-                    break
+                if remaining.hasPrefix(marker) {
+                    let afterFirst = remaining.index(after: remaining.startIndex)
+                    // make sure it's not ** (bold)
+                    if remaining[afterFirst...].hasPrefix(marker) { break }
+                    if let closeRange = remaining[afterFirst...].range(of: marker) {
+                        var italic = AttributedString(String(remaining[afterFirst..<closeRange.lowerBound]))
+                        italic.font = .body.italic()
+                        result += italic
+                        remaining = remaining[closeRange.upperBound...]
+                        foundItalic = true
+                        break
+                    }
                 }
             }
+            if foundItalic { continue }
 
-            // No more matches — append the rest as plain text
-            if result.characters.count == 0 || remaining == input[input.startIndex...] {
-                result += AttributedString(String(remaining))
-                break
-            }
+            // ✅ No pattern matched — consume ONE character and move on.
+            // This is what was missing: the old code could stall here forever.
+            result += AttributedString(String(remaining[remaining.startIndex]))
+            remaining = remaining[remaining.index(after: remaining.startIndex)...]
         }
 
         return result

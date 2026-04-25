@@ -117,6 +117,7 @@ class SpeechManager: NSObject, ObservableObject {
         // Install tap to feed both Speech and file writer
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+            print("🎙️ TAP FIRED — frameLength: \(buffer.frameLength)") // add this
             guard let self = self else { return }
             self.recognitionRequest?.append(buffer)
             if let file = self.recordingFile {
@@ -147,6 +148,7 @@ class SpeechManager: NSObject, ObservableObject {
                     // Let the task finish naturally; handoff to Whisper happens in stopRecording
                 }
             }
+            
             if let error = error {
                 // This will also be invoked with cancellation if we cancel explicitly.
                 print("Recognition error: \(error)")
